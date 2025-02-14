@@ -66,4 +66,4 @@ while True:
         print("Saliendo del sistema. ¡Hasta luego!")
         break
     else:
-        print("Opción no válida. Intente de nuevo.")i
+        print("Opción no válida. Intente de nuevo.")
