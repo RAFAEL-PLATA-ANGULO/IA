@@ -4,11 +4,6 @@ def calcular_conflictos(solucion):
     """
     Calcula el número de conflictos en la solución.
     Dos reinas están en conflicto si se encuentran en la misma diagonal.
-    Parámetros:
-        solucion (list): Lista que representa la posición de las reinas.
-                         El índice representa la fila y el valor la columna.
-    Retorna:
-        int: Número total de conflictos (pares de reinas que se atacan).
     """
     conflictos = 0
     n = len(solucion)
@@ -21,10 +16,6 @@ def calcular_conflictos(solucion):
 def generar_vecinos(solucion):
     """
     Genera los vecinos de la solución actual intercambiando dos reinas.
-    Parámetros:
-        solucion (list): Solución actual.
-    Retorna:
-        list: Lista de tuplas (movimiento, vecino), donde 'movimiento' es el par de índices intercambiados.
     """
     vecinos = []
     n = len(solucion)
@@ -37,16 +28,7 @@ def generar_vecinos(solucion):
 
 def tabu_search(n, max_iter, tenure, solucion_inicial=None):
     """
-    Implementa el algoritmo de búsqueda tabu para el problema de las n reinas.
-    
-    Parámetros:
-        n (int): Número de reinas.
-        max_iter (int): Número máximo de iteraciones.
-        tenure (int): Duración durante la cual un movimiento permanece en la lista tabu.
-        solucion_inicial (list, opcional): Configuración inicial para las reinas. Si es None se genera aleatoriamente.
-        
-    Retorna:
-        tuple: (mejor_solucion, mejor_conflicto, iteracion_final)
+    Implementacion del algoritmo de búsqueda tabu para el problema de las n reinas.
     """
     # Si no se proporciona una solución inicial válida, se genera una aleatoria.
     if solucion_inicial is None:
@@ -62,10 +44,10 @@ def tabu_search(n, max_iter, tenure, solucion_inicial=None):
     lista_tabu = {}
     
     iteracion = 0
+    #Este ciclo repetira la busqueda hasta encontrar el menor numero de conflictos en el rango de iteraciones
     while iteracion < max_iter and mejor_conflicto > 0:
         iteracion += 1
         vecinos = generar_vecinos(solucion_actual)
-        
         mejor_vecino = None
         mejor_vecino_conflictos = float('inf')
         mejor_movimiento = None
@@ -78,7 +60,8 @@ def tabu_search(n, max_iter, tenure, solucion_inicial=None):
             if movimiento in lista_tabu and lista_tabu[movimiento] > iteracion and conflictos >= mejor_conflicto:
                 continue
             
-            if conflictos < mejor_vecino_conflictos:
+            # si el numero de conflictos es menor a los conflictos del mejor vecino , actualiza la heuristica del problema para la siguiente iteracion
+            if conflictos < mejor_vecino_conflictos:  
                 mejor_vecino_conflictos = conflictos
                 mejor_vecino = vecino
                 mejor_movimiento = movimiento
@@ -94,18 +77,14 @@ def tabu_search(n, max_iter, tenure, solucion_inicial=None):
             mejor_conflicto = mejor_vecino_conflictos
             mejor_solucion = mejor_vecino.copy()
         
-        # Muestra el progreso en cada iteración.
-        print(f"Iteración {iteracion}: Conflictos = {mejor_vecino_conflictos} | Solución: {solucion_actual}")
+        # Muestra el progreso en cada iteración y la mejor heuristica encontrada.
+        print(f"#Iteración {iteracion}: #Conflictos = {mejor_vecino_conflictos} y  Solución: {solucion_actual}")
         
     return mejor_solucion, mejor_conflicto, iteracion
 
 def obtener_configuracion_usuario(n):
     """
     Solicita al usuario que ingrese una configuración inicial válida para las reinas.
-    Parámetros:
-        n (int): Número de reinas.
-    Retorna:
-        list: Configuración ingresada por el usuario o None si es inválida.
     """
     entrada = input(f"Ingrese la configuración inicial de las reinas como una lista separada por comas (ejemplo: 3,1,7,5,0,2,4,6): ")
     try:
@@ -126,8 +105,8 @@ if __name__ == '__main__':
     
     # Menú para que el usuario elija la configuración inicial.
     print("Seleccione una opción para la configuración inicial:")
-    print("1. Generar configuración aleatoria")
-    print("2. Ingresar manualmente la configuración")
+    print("1. Generar configuración random")
+    print("2. Ingresar una  configuración manual ")
     
     opcion = input("Ingrese 1 o 2: ").strip()
     
@@ -143,6 +122,6 @@ if __name__ == '__main__':
     solucion, conflictos, iteraciones = tabu_search(N, MAX_ITER, TENURE, solucion_inicial=configuracion)
     
     print("\nResultado final:")
-    print("Solución:", solucion)
-    print("Número de conflictos:", conflictos)
-    print("Número de iteraciones:", iteraciones)
+    print("Solución final:", solucion)
+    print("cantidad de conflictos:", conflictos)
+    print("cantidad de iteraciones:", iteraciones)
