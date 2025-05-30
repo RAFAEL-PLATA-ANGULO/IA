@@ -1,16 +1,12 @@
 import tkinter as tk
-from tkinter import filedialog, ttk
-from PIL import Image, ImageTk
-import cv2
+from tkinter import filedialog, Label, Button
 import numpy as np
-import os
-from tensorflow.keras.models import load_model
-from sklearn.metrics import accuracy_score
-import random
-import matplotlib.pyplot as plt
+import cv2
+from PIL import Image, ImageTk
+import tensorflow as tf
+import keras_cv  # Asegúrate de tenerlo instalado
 
-# ====== CONFIGURACIÓN GENERAL ======
-IMG_SIZE = 28
+# Lista de clases
 CLASES = [
     'aloevera', 'banana', 'bilimbi', 'cantaloupe', 'cassava', 'coconut',
     'corn', 'cucumber', 'curcuma', 'eggplant', 'galangal', 'ginger',
@@ -19,136 +15,71 @@ CLASES = [
     'spinach', 'sweet potatoes', 'tobacco', 'waterapple', 'watermelon'
 ]
 
-model_paths = {
-    "Modelo 1": "model_1_savedmodel.h5",
-    "Modelo 2": "model_2_savedmodel.h5",
-    "Modelo 3": "model_3_savedmodel.h5",
-    "Modelo 4": "model_4_savedmodel.h5"
-}
+# Cargar el modelo con soporte para capas personalizadas
+modelo = tf.keras.models.load_model(
+    "modelos/aprendiendomachin.h5",
+    custom_objects={"ImageClassifier": keras_cv.models.ImageClassifier}
+)
 
-def pred_label(vector):
-    return CLASES[np.argmax(vector)]
+# Preprocesar imagen
+def preparar_imagen(img):
+    img = cv2.resize(img, (28, 28))
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = img.astype('float32') / 255.0
+    return np.expand_dims(img, axis=0)
 
-def preprocess_image(img):
-    img = img.resize((IMG_SIZE, IMG_SIZE)).convert("RGB")
-    img_array = np.array(img) / 255.0
-    return img_array.reshape(1, IMG_SIZE, IMG_SIZE, 3)
+# Hacer predicción y obtener probabilidad
+def predecir(img):
+    procesada = preparar_imagen(img)
+    predicciones = modelo.predict(procesada)[0]
+    indice = np.argmax(predicciones)
+    clase = CLASES[indice]
+    probabilidad = predicciones[indice] * 100
+    return clase, probabilidad
 
-# ====== INTERFAZ GRÁFICA ======
-class PlantApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Reconocedor de Plantas")
-        self.selected_model = None
-        self.image = None
-        self.tk_image = None
+# Cargar imagen desde archivo
+def cargar_imagen():
+    archivo = filedialog.askopenfilename()
+    if archivo:
+        img = cv2.imread(archivo)
+        mostrar_resultado(img)
 
-        # Dropdown para elegir modelo
-        self.model_var = tk.StringVar(value="Modelo 1")
-        model_menu = ttk.OptionMenu(root, self.model_var, "Modelo 1", *model_paths.keys())
-        model_menu.pack(pady=5)
+# Capturar imagen desde la cámara
+def capturar_imagen():
+    cam = cv2.VideoCapture(0)
+    if not cam.isOpened():
+        resultado_label.config(text="Error al abrir la cámara.")
+        return
 
-        # Botones
-        tk.Button(root, text="Cargar Imagen", command=self.load_image).pack(pady=5)
-        tk.Button(root, text="Activar Cámara", command=self.capture_image).pack(pady=5)
-        tk.Button(root, text="Predecir", command=self.predict).pack(pady=5)
-        tk.Button(root, text="Validar Todos los Modelos", command=self.validate_models).pack(pady=5)
+    ret, frame = cam.read()
+    cam.release()
+    if ret:
+        mostrar_resultado(frame)
 
-        # Área de imagen
-        self.image_label = tk.Label(root)
-        self.image_label.pack()
+# Mostrar imagen y resultado
+def mostrar_resultado(img):
+    clase, prob = predecir(img)
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img_pil = Image.fromarray(img_rgb)
+    img_pil = img_pil.resize((140, 140))
+    img_tk = ImageTk.PhotoImage(img_pil)
+    imagen_label.config(image=img_tk)
+    imagen_label.image = img_tk
+    resultado_label.config(text=f"Predicción: {clase} ({prob:.2f}%)")
 
-        # Resultado
-        self.result_label = tk.Label(root, text="", font=("Arial", 14))
-        self.result_label.pack(pady=5)
+# Interfaz
+ventana = tk.Tk()
+ventana.title("Identificador de Plantas")
+ventana.geometry("400x420")
 
-    def load_image(self):
-        path = filedialog.askopenfilename()
-        if path:
-            self.image = Image.open(path)
-            self.display_image(self.image)
+btn_cargar = Button(ventana, text="Cargar Imagen", command=cargar_imagen)
+btn_capturar = Button(ventana, text="Capturar desde Cámara", command=capturar_imagen)
+resultado_label = Label(ventana, text="Resultado aparecerá aquí", font=("Arial", 12))
+imagen_label = Label(ventana)
 
-    def capture_image(self):
-        cap = cv2.VideoCapture(0)
-        if not cap.isOpened():
-            self.result_label.config(text="No se pudo acceder a la cámara.")
-            return
-        ret, frame = cap.read()
-        cap.release()
-        if ret:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            self.image = Image.fromarray(frame)
-            self.display_image(self.image)
+btn_cargar.pack(pady=10)
+btn_capturar.pack(pady=10)
+imagen_label.pack(pady=10)
+resultado_label.pack(pady=10)
 
-    def display_image(self, pil_img):
-        resized = pil_img.resize((200, 200))
-        self.tk_image = ImageTk.PhotoImage(resized)
-        self.image_label.config(image=self.tk_image)
-
-    def predict(self):
-        model_name = self.model_var.get()
-        model_path = model_paths[model_name]
-        model = load_model(model_path)
-
-        if not self.image:
-            self.result_label.config(text="Primero selecciona o captura una imagen.")
-            return
-
-        input_data = preprocess_image(self.image)
-        prediction = model.predict(input_data)
-        label = pred_label(prediction[0])
-        self.result_label.config(text=f"Predicción: {label}")
-
-    def validate_models(self):
-        # Ruta a carpeta de prueba con subcarpetas por clase
-        test_folder = "./dataset_prueba"
-        X_test, y_test = [], []
-
-        for clase in CLASES:
-            folder = os.path.join(test_folder, clase)
-            if not os.path.isdir(folder):
-                continue
-            for fname in os.listdir(folder)[:5]:  # Solo 5 imágenes por clase
-                try:
-                    img = Image.open(os.path.join(folder, fname))
-                    X_test.append(preprocess_image(img)[0])
-                    label = np.zeros(len(CLASES))
-                    label[CLASES.index(clase)] = 1
-                    y_test.append(label)
-                except:
-                    continue
-
-        X_test = np.array(X_test)
-        y_test = np.array(y_test)
-        index = random.randint(0, len(y_test) - 1)
-
-        for name, path in model_paths.items():
-            model = load_model(path)
-            y_pred = model.predict(X_test)
-            pred_labels_list = [pred_label(p) for p in y_pred]
-            true_labels_list = [pred_label(t) for t in y_test]
-
-            pred_index_label = pred_labels_list[index]
-            true_index_label = true_labels_list[index]
-            acc = round(accuracy_score(true_labels_list, pred_labels_list), 2)
-
-            print(f"{name}:")
-            print(f" - Predicción muestra aleatoria: {pred_index_label}")
-            print(f" - Real: {true_index_label}")
-            print(f" - ¿Correcto? {pred_index_label == true_index_label}")
-            print(f" - Accuracy total: {acc}")
-            print("-" * 30)
-
-        # Mostrar imagen aleatoria usada
-        img_np = (X_test[index] * 255).astype(np.uint8)
-        img_pil = Image.fromarray(img_np)
-        img_pil = img_pil.resize((150, 150))
-        self.tk_image = ImageTk.PhotoImage(img_pil)
-        self.image_label.config(image=self.tk_image)
-        self.result_label.config(text=f"Ejemplo: {true_labels_list[index]}")
-
-# ====== EJECUTAR APP ======
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = PlantApp(root)
-    root.mainloop()
+ventana.mainloop()
